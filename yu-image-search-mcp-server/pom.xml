@@ -8,7 +8,7 @@
         <version>3.4.5</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
-    <groupId>com.yupi</groupId>
+    <groupId>com.zsr</groupId>
     <artifactId>yu-image-search-mcp-server</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <name>yu-image-search-mcp-server</name>
