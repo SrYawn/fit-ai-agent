@@ -10,9 +10,10 @@ import java.util.List;
  * 自定义基于 Token 的切词器
  */
 @Component
-class MyTokenTextSplitter {
+public class MyTokenTextSplitter {
     public List<Document> splitDocuments(List<Document> documents) {
-        TokenTextSplitter splitter = new TokenTextSplitter();
+        // 每个片段 1024 tokens，重叠 200 tokens
+        TokenTextSplitter splitter = new TokenTextSplitter(1024, 200, 10, 10000, true);
         return splitter.apply(documents);
     }
 

@@ -1,17 +1,28 @@
 spring:
   application:
-    name: yu-ai-agent
+    name: fit-ai-agent
   profiles:
     active: local
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.model.ollama.autoconfigure.OllamaChatAutoConfiguration
+      - org.springframework.ai.model.ollama.autoconfigure.OllamaEmbeddingAutoConfiguration
 # 临时注释掉，便于大家开发调试和部署（实际填写 PgVector 数据库信息）
 #  datasource:
 #    url: xxx
 #    username: root
 #    password: 123456
+  datasource:
+    url: jdbc:mysql://localhost:3306/fitness_db?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai
+    username: ${MYSQL_USERNAME:fitness_user}
+    password: ${MYSQL_PASSWORD:fitness_pass}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  elasticsearch:
+    uris: ${ELASTICSEARCH_URIS:http://localhost:9200}
   ai:
     dashscope:
-      # 需要替换为你自己的 key
-      api-key: your-api-key
+      # 需要替换为你自己的 key（或在 application-local.yml 中配置）
+      api-key: ${DASHSCOPE_API_KEY:your-api-key}
       chat:
         options:
           model: qwen-plus
@@ -35,6 +46,12 @@ spring:
 #        dimensions: 1536
 #        distance-type: COSINE_DISTANCE
 #        max-document-batch-size: 10000 # Optional: Maximum number of documents per batch
+    vectorstore:
+      elasticsearch:
+        initialize-schema: true
+        index-name: fitness-knowledge
+        dimensions: 1024
+        similarity: cosine
 server:
   port: 8123
   servlet:
@@ -58,8 +75,12 @@ knife4j:
     language: zh_cn
 # searchAPI
 search-api:
-  # 需要替换为你自己的 key
-  api-key: 你的 API Key
+  # 需要替换为你自己的 key（或在 application-local.yml 中配置）
+  api-key: ${SEARCH_API_KEY:your-search-api-key}
+fitness:
+  knowledge:
+    # DashScope embedding: input.contents 单次最大 10
+    embedding-batch-size: 10
 # 修改日志级别，查看 Spring AI 更多调用细节
 logging:
   level:
