@@ -111,7 +111,7 @@ public abstract class BaseAgent {
                 org.springframework.ai.chat.messages.AssistantMessage assistantMessage =
                     (org.springframework.ai.chat.messages.AssistantMessage) message;
                 String text = assistantMessage.getText();
-                if (StrUtil.isNotBlank(text) && !text.contains("工具") && text.length() > 50) {
+                if (StrUtil.isNotBlank(text)) {
                     return text;
                 }
             }

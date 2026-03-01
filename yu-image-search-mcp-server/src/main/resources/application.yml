@@ -3,5 +3,7 @@ spring:
     name: fit-image-search-mcp-server
   profiles:
     active: sse
+pexels:
+  api-key: ${PEXELS_API_KEY:}
 server:
   port: 8127

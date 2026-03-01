@@ -25,6 +25,9 @@ public class ToolRegistration {
     @Autowired(required = false)
     private ToolCallbackProvider toolCallbackProvider;
 
+    @Autowired
+    private KnowledgeSearchTool knowledgeSearchTool;
+
     /**
      * 本地工具
      */
@@ -45,7 +48,8 @@ public class ToolRegistration {
                 resourceDownloadTool,
                 terminalOperationTool,
                 pdfGenerationTool,
-                terminateTool
+                terminateTool,
+                knowledgeSearchTool
         ).build().getToolCallbacks();
         logToolNames("local", localTools);
         return localTools;
