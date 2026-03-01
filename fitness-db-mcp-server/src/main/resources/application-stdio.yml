@@ -2,7 +2,7 @@ spring:
   ai:
     mcp:
       server:
-        name: fit-image-search-mcp-server
+        name: fitness-db-mcp-server
         version: 0.0.1
         type: SYNC
         # stdio

@@ -1,10 +1,10 @@
-package com.zsr.yuimagesearchmcpserver;
+package com.zsr.fitnessdbmcpserver;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class YuImageSearchMcpServerApplicationTests {
+class FitnessDbMcpServerApplicationTests {
 
     @Test
     void contextLoads() {

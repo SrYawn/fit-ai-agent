@@ -1,13 +1,11 @@
 {
   "mcpServers": {
-    "fitness-db-mcp-server": {
+    "fitness-db": {
       "command": "java",
       "args": [
-        "-Dspring.ai.mcp.server.stdio=true",
-        "-Dspring.main.web-application-type=none",
-        "-Dlogging.pattern.console=",
         "-jar",
-        "fitness-db-mcp-server/target/fitness-db-mcp-server-0.0.1-SNAPSHOT.jar"
+        "/Users/zhusirui/IdeaProjects/fit-ai-agent/fitness-db-mcp-server/target/fitness-db-mcp-server-0.0.1-SNAPSHOT.jar",
+        "--spring.profiles.active=stdio"
       ],
       "env": {
         "SPRING_DATASOURCE_URL": "jdbc:mysql://localhost:3306/fitness_db?useSSL=false&serverTimezone=UTC&characterEncoding=utf8",

@@ -1,4 +1,4 @@
-package com.zsr.yuimagesearchmcpserver.tools;
+package com.zsr.fitimagesearchmcpserver.tools;
 
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Assertions;

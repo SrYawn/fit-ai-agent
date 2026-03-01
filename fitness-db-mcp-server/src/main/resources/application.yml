@@ -1,0 +1,12 @@
+spring:
+  application:
+    name: fitness-db-mcp-server
+  profiles:
+    active: stdio
+  datasource:
+    url: jdbc:mysql://localhost:3306/fitness_db?useSSL=false&serverTimezone=UTC&characterEncoding=utf8
+    username: root
+    password: root
+    driver-class-name: com.mysql.cj.jdbc.Driver
+server:
+  port: 8128

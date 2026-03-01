@@ -1,4 +1,4 @@
-package com.zsr.yuimagesearchmcpserver.tools;
+package com.zsr.fitimagesearchmcpserver.tools;
 
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.http.HttpUtil;
