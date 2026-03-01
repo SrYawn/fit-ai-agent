@@ -80,6 +80,13 @@ public abstract class BaseAgent {
                 state = AgentState.FINISHED;
                 results.add("Terminated: Reached max steps (" + maxSteps + ")");
             }
+
+            // 获取最终结果：从消息历史中提取 LLM 的最后一次文本响应
+            String finalResult = extractFinalResult();
+            if (StrUtil.isNotBlank(finalResult)) {
+                return finalResult;
+            }
+
             return String.join("\n", results);
         } catch (Exception e) {
             state = AgentState.ERROR;
@@ -89,6 +96,27 @@ public abstract class BaseAgent {
             // 3、清理资源
             this.cleanup();
         }
+    }
+
+    /**
+     * 从消息历史中提取最终结果
+     *
+     * @return 最终结果文本
+     */
+    private String extractFinalResult() {
+        // 从后往前查找最后一条 AssistantMessage 的文本内容
+        for (int i = messageList.size() - 1; i >= 0; i--) {
+            Message message = messageList.get(i);
+            if (message instanceof org.springframework.ai.chat.messages.AssistantMessage) {
+                org.springframework.ai.chat.messages.AssistantMessage assistantMessage =
+                    (org.springframework.ai.chat.messages.AssistantMessage) message;
+                String text = assistantMessage.getText();
+                if (StrUtil.isNotBlank(text) && !text.contains("工具") && text.length() > 50) {
+                    return text;
+                }
+            }
+        }
+        return null;
     }
 
     /**
@@ -187,6 +215,12 @@ public abstract class BaseAgent {
      * 清理资源
      */
     protected void cleanup() {
-        // 子类可以重写此方法来清理资源
+        // 重置状态为 IDLE，允许 agent 实例被重用
+        this.state = AgentState.IDLE;
+        // 清空消息历史
+        this.messageList.clear();
+        // 重置步骤计数
+        this.currentStep = 0;
+        // 子类可以重写此方法来清理额外资源
     }
 }

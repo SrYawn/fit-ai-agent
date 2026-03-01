@@ -63,13 +63,14 @@ public class ToolCallAgent extends ReActAgent {
             UserMessage userMessage = new UserMessage(getNextStepPrompt());
             getMessageList().add(userMessage);
         }
+
         // 2、调用 AI 大模型，获取工具调用结果
         List<Message> messageList = getMessageList();
         Prompt prompt = new Prompt(messageList, this.chatOptions);
         try {
             ChatResponse chatResponse = getChatClient().prompt(prompt)
                     .system(getSystemPrompt())
-                    .tools(availableTools)
+                    .toolCallbacks(availableTools)
                     .call()
                     .chatResponse();
             // 记录响应，用于等下 Act
@@ -123,7 +124,7 @@ public class ToolCallAgent extends ReActAgent {
         boolean terminateToolCalled = toolResponseMessage.getResponses().stream()
                 .anyMatch(response -> response.name().equals("doTerminate"));
         if (terminateToolCalled) {
-            // 任务结束，更改状态
+            log.info("检测到 doTerminate 调用，任务结束");
             setState(AgentState.FINISHED);
         }
         String results = toolResponseMessage.getResponses().stream()

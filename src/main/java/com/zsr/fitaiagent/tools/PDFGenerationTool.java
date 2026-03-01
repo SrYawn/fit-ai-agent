@@ -12,6 +12,9 @@ import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
 
 /**
  * PDF 生成工具
@@ -31,13 +34,7 @@ public class PDFGenerationTool {
             try (PdfWriter writer = new PdfWriter(filePath);
                  PdfDocument pdf = new PdfDocument(writer);
                  Document document = new Document(pdf)) {
-                // 自定义字体（需要人工下载字体文件到特定目录）
-//                String fontPath = Paths.get("src/main/resources/static/fonts/simsun.ttf")
-//                        .toAbsolutePath().toString();
-//                PdfFont font = PdfFontFactory.createFont(fontPath,
-//                        PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED);
-                // 使用内置中文字体
-                PdfFont font = PdfFontFactory.createFont("STSongStd-Light", "UniGB-UCS2-H");
+                PdfFont font = resolveFont();
                 document.setFont(font);
                 // 创建段落
                 Paragraph paragraph = new Paragraph(content);
@@ -48,5 +45,21 @@ public class PDFGenerationTool {
         } catch (IOException e) {
             return "Error generating PDF: " + e.getMessage();
         }
+    }
+
+    private PdfFont resolveFont() throws IOException {
+        List<String> candidateFontPaths = List.of(
+                "/System/Library/Fonts/STHeiti Light.ttc",
+                "/System/Library/Fonts/PingFang.ttc",
+                "/System/Library/Fonts/Hiragino Sans GB.ttc",
+                "/Library/Fonts/Arial Unicode.ttf",
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+        );
+        for (String fontPath : candidateFontPaths) {
+            if (Files.exists(Path.of(fontPath))) {
+                return PdfFontFactory.createFont(fontPath, PdfFontFactory.EmbeddingStrategy.PREFER_EMBEDDED);
+            }
+        }
+        return PdfFontFactory.createFont("STSongStd-Light", "UniGB-UCS2-H");
     }
 }

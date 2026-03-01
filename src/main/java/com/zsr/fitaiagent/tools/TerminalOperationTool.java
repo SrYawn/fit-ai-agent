@@ -16,8 +16,13 @@ public class TerminalOperationTool {
     public String executeTerminalCommand(@ToolParam(description = "Command to execute in the terminal") String command) {
         StringBuilder output = new StringBuilder();
         try {
-            ProcessBuilder builder = new ProcessBuilder("cmd.exe", "/c", command);
-//            Process process = Runtime.getRuntime().exec(command);
+            String os = System.getProperty("os.name", "").toLowerCase();
+            ProcessBuilder builder;
+            if (os.contains("win")) {
+                builder = new ProcessBuilder("cmd.exe", "/c", command);
+            } else {
+                builder = new ProcessBuilder("/bin/sh", "-c", command);
+            }
             Process process = builder.start();
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
                 String line;

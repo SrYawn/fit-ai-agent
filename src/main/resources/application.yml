@@ -31,14 +31,15 @@ spring:
       chat:
         model: gemma3:1b
 # 临时注释掉，便于大家开发调试和部署（实际需要启动 MCP 服务）
-   mcp:
-     client:
-       sse:
-         connections:
-           server1:
-             url: http://localhost:8127
-       stdio:
-         servers-configuration: classpath:mcp-servers.json
+    mcp:
+      client:
+        stdio:
+          servers-configuration: classpath:mcp-servers.json
+        sse:
+          connections:
+            fit-image-search-mcp-server:
+              url: http://localhost:8127
+              sse-endpoint: /sse
     vectorstore:
       elasticsearch:
         initialize-schema: true
