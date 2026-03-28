@@ -1,6 +1,7 @@
 package com.zsr.fitaiagent.controller;
 
 import com.zsr.fitaiagent.graph.FitnessWorkflowGraph;
+import com.zsr.fitaiagent.graph.FitnessWorkflowGraph.WorkflowExecutionResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -18,7 +19,7 @@ import java.util.concurrent.CompletableFuture;
  */
 @RestController
 @RequestMapping("/api/fitness/workflow")
-@Tag(name = "健身工作流", description = "基于 StateGraph 的健身 AI 工作流")
+@Tag(name = "健身工作流", description = "基于多 Agent 编排的健身 AI 工作流")
 @Slf4j
 public class FitnessWorkflowController {
 
@@ -27,7 +28,7 @@ public class FitnessWorkflowController {
 
     @PostMapping("/execute")
     @Operation(summary = "执行健身工作流", description = "根据用户输入自动识别意图并执行相应的 Agent 流程")
-    public String executeWorkflow(
+    public WorkflowExecutionResponse executeWorkflow(
             @Parameter(description = "用户输入") @RequestParam String userInput,
             @Parameter(description = "用户ID（可选，默认为1）") @RequestParam(required = false) Long userId
     ) {
@@ -36,7 +37,7 @@ public class FitnessWorkflowController {
     }
 
     @GetMapping(value = "/execute/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    @Operation(summary = "流式执行健身工作流", description = "以 SSE 方式流式返回工作流执行结果")
+    @Operation(summary = "流式执行健身工作流", description = "以 SSE 方式返回 token 级增量文本，并在 payload 中附带节点元数据")
     public SseEmitter executeWorkflowStream(
             @Parameter(description = "用户输入") @RequestParam String userInput,
             @Parameter(description = "用户ID（可选，默认为1）") @RequestParam(required = false) Long userId
@@ -49,7 +50,11 @@ public class FitnessWorkflowController {
             try {
                 fitnessWorkflowGraph.executeWorkflowStream(userInput, userId, text -> {
                     try {
-                        emitter.send(SseEmitter.event().data(text));
+                        emitter.send(
+                                SseEmitter.event()
+                                        .name(text.event())
+                                        .data(text.toPayload())
+                        );
                     } catch (IOException e) {
                         log.error("发送 SSE 数据失败", e);
                     }

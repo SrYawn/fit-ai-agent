@@ -4,7 +4,14 @@
 
 ### 1. 准备数据库
 
-确保 MySQL 数据库已启动,并执行初始化脚本:
+确保 MySQL 数据库已启动,并执行初始化脚本。若在本仓库内联调，先运行根目录的 Docker 依赖：
+
+```bash
+cd ../docker
+./start.sh
+```
+
+然后再执行初始化脚本（如需手动初始化）：
 
 ```bash
 # 初始化数据库结构
@@ -22,8 +29,8 @@ mysql -u root -p < sample-data.sql
 spring:
   datasource:
     url: jdbc:mysql://localhost:3306/fitness_db?useSSL=false&serverTimezone=UTC&characterEncoding=utf8
-    username: root
-    password: your_password
+    username: fitness_user
+    password: fitness_pass
 ```
 
 ### 3. 构建项目
@@ -100,7 +107,29 @@ java -jar target/fitness-db-mcp-server-0.0.1-SNAPSHOT.jar --spring.profiles.acti
 - 健身目标
 - 健身水平
 
-### 2. getUserInjuries
+### 2. getUserProfileById
+
+按用户 ID 查询用户基本信息
+
+**参数:**
+- `userId` (Long): 用户 ID
+
+**示例:**
+```
+查询用户ID为1的基本信息
+```
+
+**返回信息:**
+- 用户ID
+- 用户名
+- 年龄
+- 性别
+- 身高
+- 体重
+- 健身目标
+- 健身水平
+
+### 3. getUserInjuries
 
 查询用户伤病信息
 
@@ -121,7 +150,7 @@ java -jar target/fitness-db-mcp-server-0.0.1-SNAPSHOT.jar --spring.profiles.acti
 - 恢复状态
 - 受伤日期
 
-### 3. getUserTrainingRecords
+### 4. getUserTrainingRecords
 
 查询用户训练记录
 
@@ -169,9 +198,9 @@ java -jar target/fitness-db-mcp-server-0.0.1-SNAPSHOT.jar --spring.profiles.acti
 
 ### 连接数据库失败
 
-1. 检查 MySQL 是否运行: `mysql -u root -p`
+1. 检查 MySQL 是否运行: `docker ps | grep fitness-mysql`
 2. 检查数据库是否存在: `SHOW DATABASES;`
-3. 检查用户权限
+3. 检查用户权限（默认用户为 `fitness_user` / `fitness_pass`）
 4. 确认连接配置正确
 
 ### MCP 服务无法启动

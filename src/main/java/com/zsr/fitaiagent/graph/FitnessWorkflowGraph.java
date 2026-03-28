@@ -1,9 +1,10 @@
 package com.zsr.fitaiagent.graph;
 
-import com.alibaba.cloud.ai.graph.*;
-import com.alibaba.cloud.ai.graph.action.NodeAction;
-import com.alibaba.cloud.ai.graph.state.strategy.ReplaceStrategy;
-import com.zsr.fitaiagent.agent.*;
+import com.zsr.fitaiagent.agent.ActionGuidanceAgent;
+import com.zsr.fitaiagent.agent.ChatAgent;
+import com.zsr.fitaiagent.agent.IntentRecognitionAgent;
+import com.zsr.fitaiagent.agent.PlanGenerationAgent;
+import com.zsr.fitaiagent.agent.UserProfileAgent;
 import com.zsr.fitaiagent.tools.IntentRouteTool;
 import com.zsr.fitaiagent.tools.KnowledgeSearchTool;
 import com.zsr.fitaiagent.tools.TerminateTool;
@@ -14,24 +15,14 @@ import org.springframework.ai.tool.method.MethodToolCallbackProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
-
-import static com.alibaba.cloud.ai.graph.action.AsyncEdgeAction.edge_async;
-import static com.alibaba.cloud.ai.graph.action.AsyncNodeAction.node_async;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 
 /**
- * 健身工作流图
- * 使用 Spring AI Alibaba StateGraph 框架构建多 Agent 协作工作流
- *
- * 工作流程：
- * 1. 意图识别 Agent 识别用户意图
- * 2. 根据意图路由到不同的 Agent：
- *    - 计划生成：用户画像 Agent → 计划生成 Agent
- *    - 动作指导：动作指导 Agent
- *    - 闲聊：闲聊 Agent
+ * 健身工作流编排。
+ * 同步接口返回结构化 JSON，流式接口返回 token 级 SSE 事件，并在 payload 中携带节点元数据。
  */
 @Component
 @Slf4j
@@ -46,34 +37,248 @@ public class FitnessWorkflowGraph {
     @Autowired
     private ToolCallback[] mcpTools;
 
-    @Autowired
-    private ToolCallback[] allTools;
+    public WorkflowExecutionResponse executeWorkflow(String userInput, Long userId) {
+        Long resolvedUserId = userId != null ? userId : 1L;
+        log.info("执行工作流 - 用户输入: {}, 用户ID: {}", userInput, resolvedUserId);
 
-    /**
-     * 构建健身工作流图
-     */
-    public CompiledGraph buildWorkflow() throws Exception {
-        log.info("开始构建健身工作流图...");
+        try {
+            AgentBundle agents = createAgentBundle();
+            String intent = recognizeIntent(userInput, agents);
 
-        ChatClient chatClient = chatClientBuilder.build();
+            return switch (intent) {
+                case "plan_generation" -> executePlanWorkflow(userInput, resolvedUserId, intent, agents);
+                case "action_guidance" -> executeActionGuidanceWorkflow(userInput, resolvedUserId, intent, agents);
+                default -> executeChatWorkflow(userInput, resolvedUserId, intent, agents);
+            };
+        } catch (Exception e) {
+            log.error("执行工作流失败", e);
+            return WorkflowExecutionResponse.failed(userInput, resolvedUserId, "workflow", "执行失败：" + e.getMessage());
+        }
+    }
 
-        // 1. 定义状态管理策略
-        KeyStrategyFactory keyStrategyFactory = () -> {
-            HashMap<String, KeyStrategy> strategies = new HashMap<>();
-            strategies.put("user_input", new ReplaceStrategy());
-            strategies.put("user_id", new ReplaceStrategy());
-            strategies.put("intent", new ReplaceStrategy());
-            strategies.put("user_profile", new ReplaceStrategy());
-            strategies.put("final_result", new ReplaceStrategy());
-            return strategies;
+    public void executeWorkflowStream(String userInput, Long userId, Consumer<WorkflowStreamEvent> outputConsumer) {
+        Long resolvedUserId = userId != null ? userId : 1L;
+        AtomicLong sequence = new AtomicLong(0L);
+        log.info("流式执行工作流 - 用户输入: {}, 用户ID: {}", userInput, resolvedUserId);
+
+        try {
+            AgentBundle agents = createAgentBundle();
+            outputConsumer.accept(WorkflowStreamEvent.metadata(
+                    "workflow",
+                    "started",
+                    "工作流开始执行",
+                    null,
+                    null,
+                    sequence.incrementAndGet()
+            ));
+
+            String intent = recognizeIntent(userInput, agents);
+            String executionNode = resolveExecutionNode(intent);
+            outputConsumer.accept(WorkflowStreamEvent.metadata(
+                    executionNode,
+                    "routed",
+                    "识别意图：" + intent,
+                    intent,
+                    null,
+                    sequence.incrementAndGet()
+            ));
+
+            switch (intent) {
+                case "plan_generation" -> streamPlanWorkflow(
+                        userInput,
+                        resolvedUserId,
+                        intent,
+                        agents,
+                        outputConsumer,
+                        sequence
+                );
+                case "action_guidance" -> streamActionGuidanceWorkflow(
+                        userInput,
+                        resolvedUserId,
+                        intent,
+                        agents,
+                        outputConsumer,
+                        sequence
+                );
+                default -> streamChatWorkflow(
+                        userInput,
+                        resolvedUserId,
+                        intent,
+                        agents,
+                        outputConsumer,
+                        sequence
+                );
+            }
+        } catch (Exception e) {
+            log.error("流式执行工作流失败", e);
+            outputConsumer.accept(WorkflowStreamEvent.error(
+                    "workflow",
+                    "执行失败：" + e.getMessage(),
+                    sequence.incrementAndGet()
+            ));
+        }
+    }
+
+    private WorkflowExecutionResponse executePlanWorkflow(String userInput, Long userId, String intent, AgentBundle agents) {
+        String userProfile = agents.userProfileAgent().generateUserProfile(userId);
+        String profileStatus = extractProfileStatus(userProfile);
+        String result = agents.planAgent().generatePlan(userProfile, userInput);
+        return WorkflowExecutionResponse.completed(userInput, userId, intent, "plan_generation", result, profileStatus);
+    }
+
+    private WorkflowExecutionResponse executeActionGuidanceWorkflow(String userInput, Long userId, String intent, AgentBundle agents) {
+        String result = agents.actionAgent().provideGuidance(userInput);
+        return WorkflowExecutionResponse.completed(userInput, userId, intent, "action_guidance", result, null);
+    }
+
+    private WorkflowExecutionResponse executeChatWorkflow(String userInput, Long userId, String intent, AgentBundle agents) {
+        String result = agents.chatAgent().chat(userInput);
+        return WorkflowExecutionResponse.completed(userInput, userId, intent, "chat", result, null);
+    }
+
+    private void streamPlanWorkflow(String userInput,
+                                    Long userId,
+                                    String intent,
+                                    AgentBundle agents,
+                                    Consumer<WorkflowStreamEvent> outputConsumer,
+                                    AtomicLong sequence) {
+        outputConsumer.accept(WorkflowStreamEvent.metadata(
+                "user_profile",
+                "started",
+                "开始准备用户画像",
+                intent,
+                null,
+                sequence.incrementAndGet()
+        ));
+        String userProfile = agents.userProfileAgent().generateUserProfile(userId);
+        String profileStatus = extractProfileStatus(userProfile);
+        outputConsumer.accept(WorkflowStreamEvent.metadata(
+                "user_profile",
+                "completed",
+                "用户画像准备完成",
+                intent,
+                profileStatus,
+                sequence.incrementAndGet()
+        ));
+        outputConsumer.accept(WorkflowStreamEvent.metadata(
+                "plan_generation",
+                "streaming",
+                "开始流式生成健身计划",
+                intent,
+                profileStatus,
+                sequence.incrementAndGet()
+        ));
+
+        String result = agents.planAgent().streamPlan(userProfile, userInput, chunk -> outputConsumer.accept(
+                WorkflowStreamEvent.token("plan_generation", chunk, intent, sequence.incrementAndGet())
+        ));
+        outputConsumer.accept(WorkflowStreamEvent.done(
+                "plan_generation",
+                "流式输出完成",
+                intent,
+                profileStatus,
+                result,
+                sequence.incrementAndGet()
+        ));
+    }
+
+    private void streamActionGuidanceWorkflow(String userInput,
+                                              Long userId,
+                                              String intent,
+                                              AgentBundle agents,
+                                              Consumer<WorkflowStreamEvent> outputConsumer,
+                                              AtomicLong sequence) {
+        outputConsumer.accept(WorkflowStreamEvent.metadata(
+                "action_guidance",
+                "streaming",
+                "开始流式生成动作指导",
+                intent,
+                null,
+                sequence.incrementAndGet()
+        ));
+
+        String result = agents.actionAgent().streamGuidance(userInput, chunk -> outputConsumer.accept(
+                WorkflowStreamEvent.token("action_guidance", chunk, intent, sequence.incrementAndGet())
+        ));
+        outputConsumer.accept(WorkflowStreamEvent.done(
+                "action_guidance",
+                "流式输出完成",
+                intent,
+                null,
+                result,
+                sequence.incrementAndGet()
+        ));
+    }
+
+    private void streamChatWorkflow(String userInput,
+                                    Long userId,
+                                    String intent,
+                                    AgentBundle agents,
+                                    Consumer<WorkflowStreamEvent> outputConsumer,
+                                    AtomicLong sequence) {
+        outputConsumer.accept(WorkflowStreamEvent.metadata(
+                "chat",
+                "streaming",
+                "开始流式生成回复",
+                intent,
+                null,
+                sequence.incrementAndGet()
+        ));
+
+        String result = agents.chatAgent().streamChat(userInput, chunk -> outputConsumer.accept(
+                WorkflowStreamEvent.token("chat", chunk, intent, sequence.incrementAndGet())
+        ));
+        outputConsumer.accept(WorkflowStreamEvent.done(
+                "chat",
+                "流式输出完成",
+                intent,
+                null,
+                result,
+                sequence.incrementAndGet()
+        ));
+    }
+
+    private String recognizeIntent(String userInput, AgentBundle agents) {
+        agents.intentRouteTool().reset();
+        agents.intentAgent().recognizeIntent(userInput);
+        String intent = agents.intentRouteTool().getRecognizedIntent();
+        if (intent == null || intent.isBlank()) {
+            log.warn("未能识别意图，默认回退到 chat");
+            return "chat";
+        }
+        return intent;
+    }
+
+    private String resolveExecutionNode(String intent) {
+        return switch (intent) {
+            case "plan_generation" -> "plan_generation";
+            case "action_guidance" -> "action_guidance";
+            default -> "chat";
         };
+    }
 
-        // 2. 创建工具
+    private String extractProfileStatus(String userProfile) {
+        if (userProfile == null || userProfile.isBlank()) {
+            return "DEGRADED";
+        }
+        if (userProfile.startsWith("DATA_STATUS: GROUNDED")) {
+            return "GROUNDED";
+        }
+        return "DEGRADED";
+    }
+
+    private AgentBundle createAgentBundle() {
+        ChatClient chatClient = chatClientBuilder.build();
         TerminateTool terminateTool = new TerminateTool();
         IntentRouteTool intentRouteTool = new IntentRouteTool();
 
         ToolCallback[] intentTools = MethodToolCallbackProvider.builder()
                 .toolObjects(intentRouteTool, terminateTool)
+                .build()
+                .getToolCallbacks();
+
+        ToolCallback[] chatTools = MethodToolCallbackProvider.builder()
+                .toolObjects(terminateTool)
                 .build()
                 .getToolCallbacks();
 
@@ -85,225 +290,18 @@ public class FitnessWorkflowGraph {
                 mcpTools
         );
 
-        ToolCallback[] chatTools = MethodToolCallbackProvider.builder()
-                .toolObjects(terminateTool)
-                .build()
-                .getToolCallbacks();
+        ToolCallback[] userProfileTools = combineTools(chatTools, mcpTools);
 
-        // 3. 创建业务 Agent 实例
-        IntentRecognitionAgent intentAgent = new IntentRecognitionAgent(intentTools, chatClient);
-        UserProfileAgent userProfileAgent = new UserProfileAgent(allTools, chatClient);
-        PlanGenerationAgent planAgent = new PlanGenerationAgent(ragAndMcpTools, chatClient);
-        ActionGuidanceAgent actionAgent = new ActionGuidanceAgent(ragAndMcpTools, chatClient);
-        ChatAgent chatAgent = new ChatAgent(chatTools, chatClient);
-
-        // 4. 创建工作流节点（使用已有的业务 Agent）
-
-        // 意图识别节点
-        class IntentRecognitionNode implements NodeAction {
-            @Override
-            public Map<String, Object> apply(OverAllState state) throws Exception {
-                String userInput = state.value("user_input", "").toString();
-                log.info("执行意图识别 - 用户输入: {}", userInput);
-
-                intentAgent.recognizeIntent(userInput);
-                String intent = intentRouteTool.getRecognizedIntent();
-
-                if (intent == null) {
-                    log.warn("未能识别意图，默认为闲聊");
-                    intent = "chat";
-                }
-
-                log.info("识别到的意图: {}", intent);
-                return Map.of("intent", intent, "_condition_result", intent);
-            }
-        }
-
-        // 用户画像节点
-        class UserProfileNode implements NodeAction {
-            @Override
-            public Map<String, Object> apply(OverAllState state) throws Exception {
-                Long userId = ((Number) state.value("user_id", 1L)).longValue();
-                log.info("生成用户画像 - 用户ID: {}", userId);
-
-                String userProfile = userProfileAgent.generateUserProfile(userId);
-                log.info("用户画像生成完成");
-
-                return Map.of("user_profile", userProfile);
-            }
-        }
-
-        // 计划生成节点
-        class PlanGenerationNode implements NodeAction {
-            @Override
-            public Map<String, Object> apply(OverAllState state) throws Exception {
-                String userProfile = state.value("user_profile", "").toString();
-                String userInput = state.value("user_input", "").toString();
-                log.info("生成健身计划");
-
-                String plan = planAgent.generatePlan(userProfile, userInput);
-                log.info("健身计划生成完成");
-
-                return Map.of("final_result", plan);
-            }
-        }
-
-        // 动作指导节点
-        class ActionGuidanceNode implements NodeAction {
-            @Override
-            public Map<String, Object> apply(OverAllState state) throws Exception {
-                String userInput = state.value("user_input", "").toString();
-                log.info("提供动作指导");
-
-                String guidance = actionAgent.provideGuidance(userInput);
-                log.info("动作指导完成");
-
-                return Map.of("final_result", guidance);
-            }
-        }
-
-        // 闲聊节点
-        class ChatNode implements NodeAction {
-            @Override
-            public Map<String, Object> apply(OverAllState state) throws Exception {
-                String userInput = state.value("user_input", "").toString();
-                log.info("处理闲聊");
-
-                String response = chatAgent.chat(userInput);
-                log.info("闲聊处理完成");
-
-                return Map.of("final_result", response);
-            }
-        }
-
-        // 5. 构建 StateGraph
-        StateGraph workflow = new StateGraph(keyStrategyFactory);
-
-        // 添加节点
-        workflow.addNode("intent_recognition", node_async(new IntentRecognitionNode()));
-        workflow.addNode("user_profile", node_async(new UserProfileNode()));
-        workflow.addNode("plan_generation", node_async(new PlanGenerationNode()));
-        workflow.addNode("action_guidance", node_async(new ActionGuidanceNode()));
-        workflow.addNode("chat", node_async(new ChatNode()));
-
-        // 6. 定义工作流程
-        workflow.addEdge(StateGraph.START, "intent_recognition");
-
-        // 条件路由
-        workflow.addConditionalEdges(
-                "intent_recognition",
-                edge_async(state -> state.value("_condition_result", "chat").toString()),
-                Map.of(
-                        "plan_generation", "user_profile",
-                        "action_guidance", "action_guidance",
-                        "chat", "chat"
-                )
+        return new AgentBundle(
+                intentRouteTool,
+                new IntentRecognitionAgent(intentTools, chatClient),
+                new UserProfileAgent(userProfileTools, chatClient),
+                new PlanGenerationAgent(ragAndMcpTools, chatClient),
+                new ActionGuidanceAgent(ragAndMcpTools, chatClient),
+                new ChatAgent(chatTools, chatClient)
         );
-
-        // 计划生成流程：用户画像 -> 计划生成
-        workflow.addEdge("user_profile", "plan_generation");
-
-        // 设置结束点
-        workflow.addEdge("plan_generation", StateGraph.END);
-        workflow.addEdge("action_guidance", StateGraph.END);
-        workflow.addEdge("chat", StateGraph.END);
-
-        // 7. 编译图
-        CompiledGraph compiledGraph = workflow.compile(CompileConfig.builder().build());
-        log.info("健身工作流图构建完成");
-
-        return compiledGraph;
     }
 
-    /**
-     * 执行工作流
-     */
-    public String executeWorkflow(String userInput, Long userId) {
-        log.info("执行工作流 - 用户输入: {}, 用户ID: {}", userInput, userId);
-
-        try {
-            CompiledGraph graph = buildWorkflow();
-
-            Map<String, Object> input = Map.of(
-                    "user_input", userInput,
-                    "user_id", userId != null ? userId : 1L
-            );
-
-            // 同步执行
-            NodeOutput result = graph.stream(input).blockLast();
-
-            if (result != null) {
-                Object finalResult = result.state().value("final_result").orElse("处理完成");
-                return finalResult.toString();
-            }
-
-            return "执行失败";
-        } catch (Exception e) {
-            log.error("执行工作流失败", e);
-            return "执行失败：" + e.getMessage();
-        }
-    }
-
-    /**
-     * 流式执行工作流
-     */
-    public void executeWorkflowStream(String userInput, Long userId,
-                                      java.util.function.Consumer<String> outputConsumer) {
-        log.info("流式执行工作流 - 用户输入: {}, 用户ID: {}", userInput, userId);
-
-        try {
-            CompiledGraph graph = buildWorkflow();
-
-            Map<String, Object> input = Map.of(
-                    "user_input", userInput,
-                    "user_id", userId != null ? userId : 1L
-            );
-
-            outputConsumer.accept("工作流开始执行...");
-            AtomicBoolean finalResultSent = new AtomicBoolean(false);
-            AtomicReference<String> intentSent = new AtomicReference<>(null);
-
-            // 当前工作流主要输出 NodeOutput，而非 StreamingOutput，因此需要从状态中提取结果
-            NodeOutput lastOutput = graph.stream(input).doOnNext(output -> {
-                if (output instanceof NodeOutput nodeOutput) {
-                    nodeOutput.state().value("intent")
-                            .map(Object::toString)
-                            .ifPresent(intent -> {
-                                if (intentSent.compareAndSet(null, intent)) {
-                                    outputConsumer.accept("识别意图：" + intent);
-                                }
-                            });
-
-                    nodeOutput.state().value("final_result")
-                            .map(Object::toString)
-                            .ifPresent(finalResult -> {
-                                if (finalResultSent.compareAndSet(false, true)) {
-                                    outputConsumer.accept(finalResult);
-                                }
-                            });
-                }
-            }).blockLast();
-
-            if (!finalResultSent.get() && lastOutput != null) {
-                Object finalResult = lastOutput.state().value("final_result").orElse(null);
-                if (finalResult != null) {
-                    outputConsumer.accept(finalResult.toString());
-                    finalResultSent.set(true);
-                }
-            }
-
-            if (!finalResultSent.get()) {
-                outputConsumer.accept("处理完成，但未生成可输出的结果");
-            }
-        } catch (Exception e) {
-            log.error("流式执行工作流失败", e);
-            outputConsumer.accept("执行失败：" + e.getMessage());
-        }
-    }
-
-    /**
-     * 合并工具数组
-     */
     private ToolCallback[] combineTools(ToolCallback[]... toolArrays) {
         int totalLength = 0;
         for (ToolCallback[] array : toolArrays) {
@@ -316,7 +314,114 @@ public class FitnessWorkflowGraph {
             System.arraycopy(array, 0, combined, currentIndex, array.length);
             currentIndex += array.length;
         }
-
         return combined;
+    }
+
+    private record AgentBundle(IntentRouteTool intentRouteTool,
+                               IntentRecognitionAgent intentAgent,
+                               UserProfileAgent userProfileAgent,
+                               PlanGenerationAgent planAgent,
+                               ActionGuidanceAgent actionAgent,
+                               ChatAgent chatAgent) {
+    }
+
+    public record WorkflowExecutionResponse(String status,
+                                            String userInput,
+                                            Long userId,
+                                            String intent,
+                                            String node,
+                                            String profileStatus,
+                                            String result,
+                                            String message) {
+
+        public static WorkflowExecutionResponse completed(String userInput,
+                                                          Long userId,
+                                                          String intent,
+                                                          String node,
+                                                          String result,
+                                                          String profileStatus) {
+            return new WorkflowExecutionResponse(
+                    "completed",
+                    userInput,
+                    userId,
+                    intent,
+                    node,
+                    profileStatus,
+                    result,
+                    "工作流执行完成"
+            );
+        }
+
+        public static WorkflowExecutionResponse failed(String userInput, Long userId, String node, String message) {
+            return new WorkflowExecutionResponse(
+                    "failed",
+                    userInput,
+                    userId,
+                    null,
+                    node,
+                    null,
+                    null,
+                    message
+            );
+        }
+    }
+
+    public record WorkflowStreamEvent(String event,
+                                      String node,
+                                      String status,
+                                      String message,
+                                      String intent,
+                                      String profileStatus,
+                                      String content,
+                                      Long sequence,
+                                      Boolean done) {
+
+        public static WorkflowStreamEvent metadata(String node,
+                                                   String status,
+                                                   String message,
+                                                   String intent,
+                                                   String profileStatus,
+                                                   Long sequence) {
+            return new WorkflowStreamEvent("metadata", node, status, message, intent, profileStatus, null, sequence, false);
+        }
+
+        public static WorkflowStreamEvent token(String node, String content, String intent, Long sequence) {
+            return new WorkflowStreamEvent("token", node, "streaming", null, intent, null, content, sequence, false);
+        }
+
+        public static WorkflowStreamEvent done(String node,
+                                               String message,
+                                               String intent,
+                                               String profileStatus,
+                                               String content,
+                                               Long sequence) {
+            return new WorkflowStreamEvent("done", node, "completed", message, intent, profileStatus, content, sequence, true);
+        }
+
+        public static WorkflowStreamEvent error(String node, String message, Long sequence) {
+            return new WorkflowStreamEvent("error", node, "failed", message, null, null, null, sequence, true);
+        }
+
+        public Map<String, Object> toPayload() {
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("event", event);
+            payload.put("node", node);
+            payload.put("status", status);
+            payload.put("sequence", sequence);
+            payload.put("done", done);
+            if (message != null) {
+                payload.put("message", message);
+            }
+            if (intent != null) {
+                payload.put("intent", intent);
+            }
+            if (profileStatus != null) {
+                payload.put("profileStatus", profileStatus);
+            }
+            if (content != null) {
+                payload.put("content", content);
+            }
+            return payload;
+        }
     }
 }

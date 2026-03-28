@@ -4,6 +4,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.tool.ToolCallback;
 
+import java.util.function.Consumer;
+
 /**
  * 动作指导 Agent
  * 根据用户需求，检索健身动作知识（injury-recovery 和 exercises 类别），
@@ -67,5 +69,19 @@ public class ActionGuidanceAgent extends ToolCallAgent {
                 userRequest
         );
         return this.run(userPrompt);
+    }
+
+    public String streamGuidance(String userRequest, Consumer<String> tokenConsumer) {
+        String userPrompt = String.format(
+                "请为用户提供以下动作的详细指导：\n\n" +
+                        "【用户需求】\n%s\n\n" +
+                        "请按照以下步骤执行：\n" +
+                        "1. 使用 searchKnowledge 工具检索 injury-recovery 类别的相关知识\n" +
+                        "2. 使用 searchKnowledge 工具检索 exercises 类别的相关知识\n" +
+                        "3. 先提取用户需求里的标准动作名称，再使用 searchImage 工具搜索图片（查询词仅保留动作名称本身）\n" +
+                        "4. 综合以上信息，生成详细的动作指导",
+                userRequest
+        );
+        return this.runWithStreamingFinalAnswer(userPrompt, tokenConsumer);
     }
 }

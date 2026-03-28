@@ -10,11 +10,15 @@
    - 参数：username (用户名)
    - 返回：用户的年龄、性别、身高、体重、健身目标、健身水平等信息
 
-2. **getUserInjuries** - 查询用户伤病信息
+2. **getUserProfileById** - 按用户 ID 查询用户基本信息
+   - 参数：userId (用户ID)
+   - 返回：用户名、年龄、性别、身高、体重、健身目标、健身水平等信息
+
+3. **getUserInjuries** - 查询用户伤病信息
    - 参数：userId (用户ID)
    - 返回：用户的所有伤病记录，包括伤病类型、部位、严重程度、恢复状态等
 
-3. **getUserTrainingRecords** - 查询用户训练记录
+4. **getUserTrainingRecords** - 查询用户训练记录
    - 参数：userId (用户ID), startDate (可选), endDate (可选)
    - 返回：用户的训练历史，包括运动名称、组数、次数、重量、时长、消耗卡路里等
 
@@ -23,8 +27,10 @@
 默认连接配置（可在 application.yml 中修改）：
 - 数据库：fitness_db
 - 地址：localhost:3306
-- 用户名：root
-- 密码：root
+- 用户名：fitness_user
+- 密码：fitness_pass
+
+运行 `fitness-db-mcp-server` 前，必须先保证 MySQL 已启动并且 `fitness_db` 可访问。当前仓库推荐直接使用根目录 `docker/docker-compose.yml` 中的 `mysql` 服务。
 
 ## 构建和运行
 

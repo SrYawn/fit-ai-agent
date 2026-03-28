@@ -1,12 +1,14 @@
 package com.zsr.fitaiagent.controller;
 
 import com.zsr.fitaiagent.agent.UserProfileAgent;
+import com.zsr.fitaiagent.tools.TerminateTool;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.tool.ToolCallback;
+import org.springframework.ai.tool.method.MethodToolCallbackProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.web.bind.annotation.*;
@@ -42,8 +44,7 @@ public class UserProfileController {
         // 创建 ChatClient
         ChatClient chatClient = chatClientBuilder.build();
 
-        // 创建 UserProfileAgent，使用所有工具（包括 MCP 工具）
-        UserProfileAgent agent = new UserProfileAgent(allTools, chatClient);
+        UserProfileAgent agent = new UserProfileAgent(buildUserProfileTools(), chatClient);
 
         // 生成用户画像
         String result = agent.generateUserProfile(userId);
@@ -62,8 +63,7 @@ public class UserProfileController {
         // 创建 ChatClient
         ChatClient chatClient = chatClientBuilder.build();
 
-        // 创建 UserProfileAgent
-        UserProfileAgent agent = new UserProfileAgent(allTools, chatClient);
+        UserProfileAgent agent = new UserProfileAgent(buildUserProfileTools(), chatClient);
 
         // 构建提示词
         String userPrompt = String.format(
@@ -105,5 +105,17 @@ public class UserProfileController {
         }
 
         return sb.toString();
+    }
+
+    private ToolCallback[] buildUserProfileTools() {
+        ToolCallback[] terminateTools = MethodToolCallbackProvider.builder()
+                .toolObjects(new TerminateTool())
+                .build()
+                .getToolCallbacks();
+
+        ToolCallback[] combined = new ToolCallback[mcpTools.length + terminateTools.length];
+        System.arraycopy(terminateTools, 0, combined, 0, terminateTools.length);
+        System.arraycopy(mcpTools, 0, combined, terminateTools.length, mcpTools.length);
+        return combined;
     }
 }

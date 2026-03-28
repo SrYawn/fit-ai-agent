@@ -19,6 +19,7 @@ import org.springframework.ai.model.tool.ToolExecutionResult;
 import org.springframework.ai.tool.ToolCallback;
 
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
@@ -132,5 +133,108 @@ public class ToolCallAgent extends ReActAgent {
                 .collect(Collectors.joining("\n"));
         log.info(results);
         return results;
+    }
+
+    /**
+     * 在完成工具调用准备后，以真实增量文本流输出最终答复。
+     *
+     * @param userPrompt    用户提示词
+     * @param tokenConsumer token 消费者
+     * @return 聚合后的最终文本
+     */
+    public String runWithStreamingFinalAnswer(String userPrompt, Consumer<String> tokenConsumer) {
+        if (this.getState() != AgentState.IDLE) {
+            throw new RuntimeException("Cannot run agent from state: " + this.getState());
+        }
+        if (StrUtil.isBlank(userPrompt)) {
+            throw new RuntimeException("Cannot run agent with empty user prompt");
+        }
+
+        this.setState(AgentState.RUNNING);
+        this.getMessageList().add(new UserMessage(userPrompt));
+
+        try {
+            for (int i = 0; i < this.getMaxSteps() && this.getState() != AgentState.FINISHED; i++) {
+                int stepNumber = i + 1;
+                this.setCurrentStep(stepNumber);
+                log.info("Executing streaming step {}/{}", stepNumber, this.getMaxSteps());
+
+                AssistantMessage assistantMessage = thinkForStreaming();
+                List<AssistantMessage.ToolCall> toolCallList = assistantMessage.getToolCalls();
+
+                if (toolCallList.isEmpty()) {
+                    return streamFinalAnswer(tokenConsumer);
+                }
+
+                act();
+            }
+
+            if (this.getCurrentStep() >= this.getMaxSteps()) {
+                log.warn("{} reached max steps during streaming execution", this.getName());
+            }
+
+            return streamFinalAnswer(tokenConsumer);
+        } catch (Exception e) {
+            this.setState(AgentState.ERROR);
+            log.error("error executing agent with streaming final answer", e);
+            throw new RuntimeException("执行错误：" + e.getMessage(), e);
+        } finally {
+            this.cleanup();
+        }
+    }
+
+    private AssistantMessage thinkForStreaming() {
+        if (StrUtil.isNotBlank(getNextStepPrompt())) {
+            getMessageList().add(new UserMessage(getNextStepPrompt()));
+        }
+
+        Prompt prompt = new Prompt(getMessageList(), this.chatOptions);
+        ChatResponse chatResponse = getChatClient().prompt(prompt)
+                .system(getSystemPrompt())
+                .toolCallbacks(availableTools)
+                .call()
+                .chatResponse();
+
+        this.toolCallChatResponse = chatResponse;
+        AssistantMessage assistantMessage = chatResponse.getResult().getOutput();
+        List<AssistantMessage.ToolCall> toolCallList = assistantMessage.getToolCalls();
+        log.info("{}的流式预处理思考：{}", getName(), assistantMessage.getText());
+        log.info("{}选择了 {} 个工具来使用", getName(), toolCallList.size());
+        if (!toolCallList.isEmpty()) {
+            String toolCallInfo = toolCallList.stream()
+                    .map(toolCall -> String.format("工具名称：%s，参数：%s", toolCall.name(), toolCall.arguments()))
+                    .collect(Collectors.joining("\n"));
+            log.info(toolCallInfo);
+        }
+        return assistantMessage;
+    }
+
+    private String streamFinalAnswer(Consumer<String> tokenConsumer) {
+        this.getMessageList().add(new UserMessage("""
+                请基于当前上下文和已有工具结果，直接输出最终给用户的答复。
+                不要调用任何工具，包括 doTerminate。
+                不要输出你的思考过程，只输出最终内容。
+                """));
+
+        StringBuilder contentBuilder = new StringBuilder();
+        Prompt prompt = new Prompt(getMessageList(), this.chatOptions);
+        getChatClient().prompt(prompt)
+                .system(getSystemPrompt())
+                .stream()
+                .content()
+                .doOnNext(chunk -> {
+                    if (chunk != null && !chunk.isEmpty()) {
+                        contentBuilder.append(chunk);
+                        tokenConsumer.accept(chunk);
+                    }
+                })
+                .blockLast();
+
+        String finalAnswer = contentBuilder.toString();
+        if (StrUtil.isNotBlank(finalAnswer)) {
+            getMessageList().add(new AssistantMessage(finalAnswer));
+        }
+        this.setState(AgentState.FINISHED);
+        return finalAnswer;
     }
 }

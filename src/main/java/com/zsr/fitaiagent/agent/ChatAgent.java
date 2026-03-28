@@ -4,6 +4,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.tool.ToolCallback;
 
+import java.util.function.Consumer;
+
 /**
  * 闲聊 Agent
  * 处理用户的问候、闲聊等非健身相关的对话
@@ -52,5 +54,13 @@ public class ChatAgent extends ToolCallAgent {
                 userInput
         );
         return this.run(userPrompt);
+    }
+
+    public String streamChat(String userInput, Consumer<String> tokenConsumer) {
+        String userPrompt = String.format(
+                "用户说：%s\n\n请给出友好的回复。",
+                userInput
+        );
+        return this.runWithStreamingFinalAnswer(userPrompt, tokenConsumer);
     }
 }
