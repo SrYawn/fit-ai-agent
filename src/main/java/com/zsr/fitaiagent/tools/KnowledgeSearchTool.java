@@ -27,7 +27,7 @@ public class KnowledgeSearchTool {
 
             Parameters:
             - query: The search query (e.g., "weight loss training", "muscle building exercises")
-            - category: Optional category filter (e.g., "injury-recovery", "exercises", "nutrition")
+            - category: Optional category filter (e.g., "injury-recovery", "exercise", "nutrition", "training-plan", "body-knowledge", "motivation")
 
             Returns: Relevant fitness knowledge documents
             """)

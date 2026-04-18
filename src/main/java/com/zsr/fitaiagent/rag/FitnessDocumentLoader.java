@@ -28,7 +28,8 @@ public class FitnessDocumentLoader {
             "injury-recovery",
             "nutrition",
             "training-plan",
-            "body-knowledge"
+            "body-knowledge",
+            "motivation"
     };
 
     private final ResourcePatternResolver resourcePatternResolver;

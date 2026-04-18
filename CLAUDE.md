@@ -36,6 +36,14 @@
   - 用户名：`fitness_user`
   - 密码：`fitness_pass`
 
+## 完整的启动顺序：
+  1. 启动 Docker 服务（MySQL + Elasticsearch）：                                              
+  cd docker && ./start.sh                                                                  
+  2. 启动 yu-image-search-mcp-server：                                                        
+  cd yu-image-search-mcp-server && mvn spring-boot:run &                                      
+  3. 启动主应用：                                                                             
+  mvn spring-boot:run 
+
 ## 快速入口
 
 - `openspec/index.md`

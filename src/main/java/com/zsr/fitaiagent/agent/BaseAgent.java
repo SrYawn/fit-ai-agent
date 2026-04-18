@@ -105,14 +105,25 @@ public abstract class BaseAgent {
      */
     private String extractFinalResult() {
         // 从后往前查找最后一条 AssistantMessage 的文本内容
+        // 跳过只包含工具调用、没有实际文本内容的消息
         for (int i = messageList.size() - 1; i >= 0; i--) {
             Message message = messageList.get(i);
             if (message instanceof org.springframework.ai.chat.messages.AssistantMessage) {
                 org.springframework.ai.chat.messages.AssistantMessage assistantMessage =
                     (org.springframework.ai.chat.messages.AssistantMessage) message;
                 String text = assistantMessage.getText();
+                // 只返回有实际内容的文本，跳过以下情况：
+                // 1. 空文本
+                // 2. 只包含 "doTerminate" 的消息（工具调用标识）
+                // 3. 只有工具调用没有文本的消息（text 为空但有 toolCalls）
                 if (StrUtil.isNotBlank(text)) {
-                    return text;
+                    String trimmedText = text.trim();
+                    // 跳过只包含工具调用标识的消息
+                    if (!trimmedText.equals("doTerminate") &&
+                        !trimmedText.isEmpty() &&
+                        trimmedText.length() > 10) {  // 确保是有意义的回复，至少10个字符
+                        return text;
+                    }
                 }
             }
         }

@@ -8,7 +8,7 @@ import java.util.function.Consumer;
 
 /**
  * 动作指导 Agent
- * 根据用户需求，检索健身动作知识（injury-recovery 和 exercises 类别），
+ * 根据用户需求，检索健身动作知识（injury-recovery 和 exercise 类别），
  * 并调用图片搜索 MCP 工具返回对应的健身动作图片和建议
  */
 @Slf4j
@@ -20,7 +20,7 @@ public class ActionGuidanceAgent extends ToolCallAgent {
             1. 理解用户想要了解的健身动作或康复训练
             2. 使用 RAG 检索工具查询相关的动作知识
                - 优先检索 injury-recovery（康复训练）类别的知识
-               - 同时检索 exercises（健身动作）类别的知识
+               - 同时检索 exercise（健身动作）类别的知识
             3. 使用图片搜索 MCP 工具查找相关的动作示范图片
             4. 综合文字说明和图片，为用户提供详细的动作指导
 
@@ -34,7 +34,7 @@ public class ActionGuidanceAgent extends ToolCallAgent {
 
             **重要规则**：
             - 先使用 searchKnowledge 工具检索 injury-recovery 类别的知识
-            - 再使用 searchKnowledge 工具检索 exercises 类别的知识
+            - 再使用 searchKnowledge 工具检索 exercise 类别的知识
             - 使用 searchImage 工具搜索动作图片时，查询词只允许是标准动作名称本身（例如：深蹲、硬拉、平板支撑）
             - 不要在 searchImage 查询词中加入“标准”“动作示范”“正面侧面”“proper form”等修饰词
             - 即使图片搜索失败或无结果，也必须输出完整的文字动作指导，并明确说明“图片暂未检索到”
@@ -63,7 +63,7 @@ public class ActionGuidanceAgent extends ToolCallAgent {
                         "【用户需求】\n%s\n\n" +
                         "请按照以下步骤执行：\n" +
                         "1. 使用 searchKnowledge 工具检索 injury-recovery 类别的相关知识\n" +
-                        "2. 使用 searchKnowledge 工具检索 exercises 类别的相关知识\n" +
+                        "2. 使用 searchKnowledge 工具检索 exercise 类别的相关知识\n" +
                         "3. 先提取用户需求里的标准动作名称，再使用 searchImage 工具搜索图片（查询词仅保留动作名称本身）\n" +
                         "4. 综合以上信息，生成详细的动作指导",
                 userRequest
@@ -77,7 +77,7 @@ public class ActionGuidanceAgent extends ToolCallAgent {
                         "【用户需求】\n%s\n\n" +
                         "请按照以下步骤执行：\n" +
                         "1. 使用 searchKnowledge 工具检索 injury-recovery 类别的相关知识\n" +
-                        "2. 使用 searchKnowledge 工具检索 exercises 类别的相关知识\n" +
+                        "2. 使用 searchKnowledge 工具检索 exercise 类别的相关知识\n" +
                         "3. 先提取用户需求里的标准动作名称，再使用 searchImage 工具搜索图片（查询词仅保留动作名称本身）\n" +
                         "4. 综合以上信息，生成详细的动作指导",
                 userRequest
