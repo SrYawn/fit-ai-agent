@@ -1,3 +1,5 @@
+SET NAMES utf8mb4;
+
 -- 创建健身数据库
 CREATE DATABASE IF NOT EXISTS fitness_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -7,6 +9,8 @@ USE fitness_db;
 CREATE TABLE IF NOT EXISTS user_profile (
     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '用户ID',
     username VARCHAR(50) NOT NULL UNIQUE COMMENT '用户名',
+    password_hash VARCHAR(255) COMMENT '密码哈希',
+    role VARCHAR(20) DEFAULT 'USER' COMMENT '角色(USER/ADMIN)',
     age INT COMMENT '年龄',
     gender ENUM('MALE', 'FEMALE', 'OTHER') COMMENT '性别',
     height DECIMAL(5,2) COMMENT '身高(cm)',

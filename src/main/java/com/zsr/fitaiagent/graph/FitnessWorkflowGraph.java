@@ -5,7 +5,7 @@ import com.zsr.fitaiagent.agent.CompanionMotivationAgent;
 import com.zsr.fitaiagent.agent.IntentRecognitionAgent;
 import com.zsr.fitaiagent.agent.PlanGenerationAgent;
 import com.zsr.fitaiagent.agent.UserProfileAgent;
-import com.zsr.fitaiagent.chatmemory.InMemorySessionChatMemory;
+import com.zsr.fitaiagent.chatmemory.JdbcSessionChatMemory;
 import com.zsr.fitaiagent.tools.EmotionDetectionTool;
 import com.zsr.fitaiagent.tools.IntentRouteTool;
 import com.zsr.fitaiagent.tools.KnowledgeSearchTool;
@@ -60,6 +60,11 @@ public class FitnessWorkflowGraph {
         log.info("执行工作流 - 用户输入: {}, 用户ID: {}, sessionId: {}", userInput, resolvedUserId, resolvedSessionId);
 
         try {
+            // 确保会话存在（首次提问时创建）
+            if (sessionChatMemory instanceof JdbcSessionChatMemory jdbcMemory) {
+                jdbcMemory.ensureSession(resolvedUserId, resolvedSessionId, userInput);
+            }
+
             AgentBundle agents = createAgentBundle();
             // 加载对话历史，注入意图识别上下文
             String sessionHistory = getSessionHistory(resolvedSessionId);
@@ -88,6 +93,11 @@ public class FitnessWorkflowGraph {
         log.info("流式执行工作流 - 用户输入: {}, 用户ID: {}, sessionId: {}", userInput, resolvedUserId, resolvedSessionId);
 
         try {
+            // 确保会话存在（首次提问时创建）
+            if (sessionChatMemory instanceof JdbcSessionChatMemory jdbcMemory) {
+                jdbcMemory.ensureSession(resolvedUserId, resolvedSessionId, userInput);
+            }
+
             AgentBundle agents = createAgentBundle();
             // 加载对话历史
             String sessionHistory = getSessionHistory(resolvedSessionId);
@@ -116,21 +126,13 @@ public class FitnessWorkflowGraph {
             ));
 
             String result = switch (intent) {
-                case "plan_generation" -> {
-                    streamPlanWorkflow(contextualInput, resolvedUserId, intent, agents, outputConsumer, sequence);
-                    yield null; // streamPlanWorkflow handles its own output
-                }
-                case "action_guidance" -> {
-                    streamActionGuidanceWorkflow(contextualInput, resolvedUserId, intent, agents, outputConsumer, sequence);
-                    yield null;
-                }
+                case "plan_generation" -> streamPlanWorkflow(contextualInput, resolvedUserId, intent, agents, outputConsumer, sequence);
+                case "action_guidance" -> streamActionGuidanceWorkflow(contextualInput, resolvedUserId, intent, agents, outputConsumer, sequence);
                 default -> streamChatWorkflow(userInput, resolvedUserId, sessionHistory, intent, agents, outputConsumer, sequence);
             };
 
-            // 保存对话到 session 记忆（流式场景下 result 可能为 null，由各子流程内部处理）
-            if (result != null) {
-                saveToSessionMemory(resolvedSessionId, userInput, result);
-            }
+            // 保存对话到 session 记忆
+            saveToSessionMemory(resolvedSessionId, userInput, result);
         } catch (Exception e) {
             log.error("流式执行工作流失败", e);
             outputConsumer.accept(WorkflowStreamEvent.error(
@@ -158,7 +160,7 @@ public class FitnessWorkflowGraph {
         return WorkflowExecutionResponse.completed(userInput, userId, sessionId, intent, "chat", result, null);
     }
 
-    private void streamPlanWorkflow(String userInput,
+    private String streamPlanWorkflow(String userInput,
                                     Long userId,
                                     String intent,
                                     AgentBundle agents,
@@ -205,9 +207,10 @@ public class FitnessWorkflowGraph {
                 result,
                 sequence.incrementAndGet()
         ));
+        return result;
     }
 
-    private void streamActionGuidanceWorkflow(String userInput,
+    private String streamActionGuidanceWorkflow(String userInput,
                                               Long userId,
                                               String intent,
                                               AgentBundle agents,
@@ -234,6 +237,7 @@ public class FitnessWorkflowGraph {
                 result,
                 sequence.incrementAndGet()
         ));
+        return result;
     }
 
     private String streamChatWorkflow(String userInput,
@@ -368,8 +372,8 @@ public class FitnessWorkflowGraph {
      * 获取格式化的 session 对话历史
      */
     private String getSessionHistory(String sessionId) {
-        if (sessionChatMemory instanceof InMemorySessionChatMemory inMemory) {
-            return inMemory.formatHistoryAsText(sessionId);
+        if (sessionChatMemory instanceof JdbcSessionChatMemory jdbcMemory) {
+            return jdbcMemory.formatHistoryAsText(sessionId);
         }
         return "";
     }

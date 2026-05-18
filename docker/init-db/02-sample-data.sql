@@ -1,10 +1,12 @@
+SET NAMES utf8mb4;
+
 USE fitness_db;
 
--- 插入示例用户数据
-INSERT INTO user_profile (username, age, gender, height, weight, fitness_goal, fitness_level) VALUES
-('zhangsan', 28, 'MALE', 175.00, 70.50, '增肌', 'INTERMEDIATE'),
-('lisi', 25, 'FEMALE', 165.00, 55.00, '减脂', 'BEGINNER'),
-('wangwu', 32, 'MALE', 180.00, 85.00, '提高体能', 'ADVANCED');
+-- 插入示例用户数据（默认密码均为 123456）
+INSERT INTO user_profile (username, password_hash, role, age, gender, height, weight, fitness_goal, fitness_level) VALUES
+('zhangsan', '$2a$10$UYrxvuKbdYO9mSlvH.ctleQzRJWL2OCQHrSlIm4v37XstiZx1/3Pm', 'ADMIN', 28, 'MALE', 175.00, 70.50, '增肌', 'INTERMEDIATE'),
+('lisi', '$2a$10$UYrxvuKbdYO9mSlvH.ctleQzRJWL2OCQHrSlIm4v37XstiZx1/3Pm', 'USER', 25, 'FEMALE', 165.00, 55.00, '减脂', 'BEGINNER'),
+('wangwu', '$2a$10$UYrxvuKbdYO9mSlvH.ctleQzRJWL2OCQHrSlIm4v37XstiZx1/3Pm', 'USER', 32, 'MALE', 180.00, 85.00, '提高体能', 'ADVANCED');
 
 -- 插入示例伤病数据
 INSERT INTO user_injury (user_id, injury_type, injury_location, severity, description, recovery_status, injury_date) VALUES

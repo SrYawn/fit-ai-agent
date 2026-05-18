@@ -4,6 +4,8 @@ import com.zsr.fitaiagent.service.FitnessKnowledgeService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -24,6 +26,9 @@ public class FitnessKnowledgeController {
 
     @Resource
     private FitnessKnowledgeService fitnessKnowledgeService;
+
+    @Resource
+    private VectorStore vectorStore;
 
     /**
      * 初始化知识库：构建 ES 索引 + 导入所有本地 md 文档
@@ -102,6 +107,35 @@ public class FitnessKnowledgeController {
         } catch (Exception e) {
             log.error("知识库检索失败: query={}, category={}", query, category, e);
             return errorResponse(HttpStatus.INTERNAL_SERVER_ERROR, "知识库检索失败", e);
+        }
+    }
+
+    /**
+     * 列出知识库条目（通过通用查询获取）
+     */
+    @GetMapping("/list")
+    public ResponseEntity<Map<String, Object>> listKnowledge(
+            @RequestParam(value = "category", required = false) String category) {
+        try {
+            log.info("收到知识库列表请求, category={}", category);
+            // 使用通用查询词获取文档
+            List<Document> results = fitnessKnowledgeService.searchKnowledge("健身 训练 运动", category);
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
+            result.put("total", results.size());
+            result.put("documents", results.stream().map(doc -> {
+                Map<String, Object> docMap = new HashMap<>();
+                docMap.put("id", doc.getId());
+                docMap.put("content", doc.getText() != null && doc.getText().length() > 200
+                        ? doc.getText().substring(0, 200) + "..."
+                        : doc.getText());
+                docMap.put("metadata", doc.getMetadata());
+                return docMap;
+            }).toList());
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            log.error("知识库列表查询失败", e);
+            return errorResponse(HttpStatus.INTERNAL_SERVER_ERROR, "知识库列表查询失败", e);
         }
     }
 

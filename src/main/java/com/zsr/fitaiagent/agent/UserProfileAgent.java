@@ -27,7 +27,7 @@ public class UserProfileAgent extends ToolCallAgent {
             请按照以下步骤执行：
             1. 使用 getUserProfileById 工具查询用户基本信息（传入 userId）
             2. 使用 getUserTrainingRecords 工具查询用户训练记录（传入 userId）
-            3. 如有必要，再使用 getUserInjuries 工具查询伤病信息（传入 userId）
+            3. 使用 getUserInjuries 工具查询用户伤病信息（传入 userId）
             4. 基于真实查询结果生成用户画像；如果数据库查询失败、返回连接错误，或关键基础信息缺失，就进入降级模式
             5. **重要：先输出完整的用户画像报告文本，然后再调用 doTerminate 工具结束任务**
 
@@ -60,7 +60,7 @@ public class UserProfileAgent extends ToolCallAgent {
     public String generateUserProfile(Long userId) {
         String userPrompt = String.format(
                 "请为用户ID=%d生成完整的用户画像。" +
-                        "必须优先使用 getUserProfileById 和 getUserTrainingRecords。" +
+                        "必须使用 getUserProfileById、getUserTrainingRecords 和 getUserInjuries 三个工具查询全部数据。" +
                         "如果真实数据不足或数据库连接失败，输出 DATA_STATUS: DEGRADED，并说明需要补充哪些信息。",
                 userId
         );
