@@ -16,11 +16,11 @@ const STATUS_ICONS = {
 }
 
 const STATUS_COLORS = {
-  started: 'text-blue-400',
-  routed: 'text-emerald-400',
-  streaming: 'text-blue-400',
-  completed: 'text-emerald-400',
-  failed: 'text-red-400',
+  started: 'text-neutral-500',
+  routed: 'text-neutral-700',
+  streaming: 'text-neutral-500',
+  completed: 'text-neutral-700',
+  failed: 'text-red-500',
 }
 
 export default function ThinkingStatus({ steps }) {
@@ -29,26 +29,26 @@ export default function ThinkingStatus({ steps }) {
   const isActive = steps.some(s => s.status === 'started' || s.status === 'streaming')
 
   return (
-    <div className="bg-gray-700/50 border border-gray-600 rounded-lg p-3 mb-3 text-sm">
+    <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-3 mb-3 text-sm">
       <div className="flex items-center gap-2 mb-2">
         {isActive && (
-          <span className="inline-block w-3 h-3 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin-slow" />
+          <span className="inline-block w-3 h-3 border-2 border-neutral-500 border-t-transparent rounded-full animate-spin-slow" />
         )}
-        <span className="font-medium text-gray-200">
+        <span className="font-medium text-neutral-700">
           {isActive ? '正在思考...' : '思考完成'}
         </span>
       </div>
       <div className="space-y-1 ml-1">
         {steps.map((step, i) => (
           <div key={i} className="flex items-center gap-2">
-            <span className={`text-xs ${STATUS_COLORS[step.status] || 'text-gray-500'}`}>
+            <span className={`text-xs ${STATUS_COLORS[step.status] || 'text-neutral-400'}`}>
               {STATUS_ICONS[step.status] || '○'}
             </span>
-            <span className="text-gray-300">
+            <span className="text-neutral-600">
               {NODE_LABELS[step.node] || step.node}
             </span>
             {step.message && (
-              <span className="text-gray-500 text-xs">— {step.message}</span>
+              <span className="text-neutral-400 text-xs">— {step.message}</span>
             )}
           </div>
         ))}

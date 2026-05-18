@@ -32,14 +32,13 @@ export default function ChatSidebar({ userId, activeSessionId, onSelectSession, 
   }, [userId])
 
   return (
-    <div className="w-60 flex flex-col h-full border-r border-gray-700/50"
-         style={{ backgroundColor: '#111827' }}>
+    <div className="w-60 flex flex-col h-full border-r border-neutral-200 bg-neutral-50">
       <div className="p-3">
         <button
           onClick={onNewChat}
-          className="w-full py-2.5 px-4 rounded-lg border border-gray-700
-                     hover:bg-gray-700/50 text-sm transition-all
-                     text-left text-gray-300 hover:text-white
+          className="w-full py-2.5 px-4 rounded-lg border border-neutral-300
+                     hover:bg-white text-sm transition-all
+                     text-left text-neutral-700 hover:text-neutral-900
                      flex items-center gap-2"
         >
           <span className="text-base">+</span>
@@ -49,7 +48,7 @@ export default function ChatSidebar({ userId, activeSessionId, onSelectSession, 
 
       <div className="flex-1 overflow-y-auto">
         {loading && sessions.length === 0 && (
-          <p className="text-gray-500 text-xs p-4">加载中...</p>
+          <p className="text-neutral-500 text-xs p-4">加载中...</p>
         )}
         {sessions.map((session) => (
           <div
@@ -57,8 +56,8 @@ export default function ChatSidebar({ userId, activeSessionId, onSelectSession, 
             onClick={() => onSelectSession(session.sessionId)}
             className={`px-4 py-2.5 cursor-pointer text-sm truncate transition-all rounded-lg mx-2 mb-0.5
               ${activeSessionId === session.sessionId
-                ? 'bg-gray-700/60 text-white'
-                : 'text-gray-400 hover:bg-gray-700/30 hover:text-gray-200'}`}
+                ? 'bg-white text-neutral-900'
+                : 'text-neutral-600 hover:bg-white/60 hover:text-neutral-900'}`}
             title={session.title}
           >
             {session.title}

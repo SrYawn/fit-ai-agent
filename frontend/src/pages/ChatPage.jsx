@@ -110,22 +110,21 @@ export default function ChatPage({ user, onLogout }) {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gray-800">
+    <div className="h-screen flex flex-col bg-white">
       {/* Header - full width, spans over sidebar */}
-      <header className="bg-gray-850 border-b border-gray-700/50 px-5 py-3 flex items-center justify-between"
-              style={{ backgroundColor: '#1a2332' }}>
-        <h1 className="text-lg font-semibold text-gray-100 tracking-wide">智能健身助理</h1>
+      <header className="bg-white border-b border-neutral-200 px-5 py-3 flex items-center justify-between">
+        <h1 className="text-lg font-semibold text-neutral-800 tracking-wide">智能健身助理</h1>
         <div className="flex items-center gap-4">
           {user.role === 'ADMIN' && (
-            <Link to="/knowledge" className="text-sm text-gray-300 hover:text-white transition-colors">
+            <Link to="/knowledge" className="text-sm text-neutral-600 hover:text-neutral-900 transition-colors">
               知识库管理
             </Link>
           )}
-          <Link to="/records" className="text-sm text-gray-300 hover:text-white transition-colors">
+          <Link to="/records" className="text-sm text-neutral-600 hover:text-neutral-900 transition-colors">
             我的记录
           </Link>
-          <span className="text-sm text-gray-500">{user.username}</span>
-          <button onClick={handleLogout} className="text-sm text-gray-400 hover:text-gray-200 transition-colors">
+          <span className="text-sm text-neutral-500">{user.username}</span>
+          <button onClick={handleLogout} className="text-sm text-neutral-500 hover:text-neutral-700 transition-colors">
             退出
           </button>
         </div>
@@ -149,10 +148,10 @@ export default function ChatPage({ user, onLogout }) {
               /* Empty state - ChatGPT style */
               <div className="flex-1 flex flex-col items-center justify-center max-w-3xl mx-auto w-full">
                 <div className="text-center mb-12">
-                  <h2 className="text-3xl font-light text-gray-200 mb-3">
+                  <h2 className="text-3xl font-light text-neutral-800 mb-3">
                     有什么可以帮忙的
                   </h2>
-                  <p className="text-gray-500 text-sm">
+                  <p className="text-neutral-500 text-sm">
                     动作指导 · 计划生成 · 知识问答 · 情感激励
                   </p>
                 </div>
