@@ -17,20 +17,30 @@ export default function KnowledgePage({ user }) {
   const [message, setMessage] = useState(null)
   const [filterCategory, setFilterCategory] = useState('')
   const [showUploadModal, setShowUploadModal] = useState(false)
+  const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(10)
+  const [total, setTotal] = useState(0)
+
+  useEffect(() => {
+    setPage(0)
+  }, [filterCategory, pageSize])
 
   useEffect(() => {
     loadDocuments()
-  }, [filterCategory])
+  }, [filterCategory, page, pageSize])
 
   const loadDocuments = async () => {
     setLoading(true)
     try {
       const params = new URLSearchParams()
       if (filterCategory) params.set('category', filterCategory)
+      params.set('page', page.toString())
+      params.set('size', pageSize.toString())
       const res = await fetch(`/api/fitness/knowledge/list?${params}`)
       const data = await res.json()
       if (data.success) {
         setDocuments(data.documents || [])
+        setTotal(data.total || 0)
       } else {
         setMessage({ type: 'error', text: data.message || '加载失败' })
       }
@@ -128,15 +138,26 @@ export default function KnowledgePage({ user }) {
         {/* 知识库条目列表 */}
         <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-medium text-gray-800">知识库条目 ({documents.length})</h2>
-            <select
-              value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
-            >
-              <option value="">全部分类</option>
-              {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-            </select>
+            <h2 className="font-medium text-gray-800">知识库条目 ({total})</h2>
+            <div className="flex items-center gap-3">
+              <select
+                value={pageSize}
+                onChange={(e) => setPageSize(Number(e.target.value))}
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              >
+                <option value={10}>10 条/页</option>
+                <option value={20}>20 条/页</option>
+                <option value={50}>50 条/页</option>
+              </select>
+              <select
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="">全部分类</option>
+                {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+              </select>
+            </div>
           </div>
 
           {loading ? (
@@ -146,7 +167,7 @@ export default function KnowledgePage({ user }) {
               暂无知识库条目，请先点击「初始化知识库」
             </div>
           ) : (
-            <div className="space-y-3 max-h-[500px] overflow-y-auto">
+            <div className="space-y-3">
               {documents.map((doc, i) => (
                 <div key={doc.id || i} className="border border-gray-100 rounded-lg p-3 text-sm">
                   <div className="flex items-center gap-2 mb-1">
@@ -160,6 +181,36 @@ export default function KnowledgePage({ user }) {
                   <p className="text-gray-600 leading-relaxed">{doc.content}</p>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* 分页控件 */}
+          {total > 0 && (
+            <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+              <span className="text-sm text-gray-500">
+                第 {page * pageSize + 1}-{Math.min((page + 1) * pageSize, total)} 条，共 {total} 条
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage(p => p - 1)}
+                  disabled={page === 0}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg
+                             hover:bg-gray-50 disabled:text-gray-300 disabled:cursor-not-allowed"
+                >
+                  上一页
+                </button>
+                <span className="text-sm text-gray-600">
+                  {page + 1} / {Math.ceil(total / pageSize)}
+                </span>
+                <button
+                  onClick={() => setPage(p => p + 1)}
+                  disabled={(page + 1) * pageSize >= total}
+                  className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg
+                             hover:bg-gray-50 disabled:text-gray-300 disabled:cursor-not-allowed"
+                >
+                  下一页
+                </button>
+              </div>
             </div>
           )}
         </div>

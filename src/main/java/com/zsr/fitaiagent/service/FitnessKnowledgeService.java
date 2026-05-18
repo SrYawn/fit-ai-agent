@@ -1,5 +1,10 @@
 package com.zsr.fitaiagent.service;
 
+import co.elastic.clients.elasticsearch.ElasticsearchClient;
+import co.elastic.clients.elasticsearch._types.query_dsl.BoolQuery;
+import co.elastic.clients.elasticsearch._types.query_dsl.Query;
+import co.elastic.clients.elasticsearch.core.SearchResponse;
+import co.elastic.clients.elasticsearch.core.search.Hit;
 import com.zsr.fitaiagent.rag.FitnessDocumentLoader;
 import com.zsr.fitaiagent.rag.MyTokenTextSplitter;
 import jakarta.annotation.Resource;
@@ -14,7 +19,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 健身知识库业务逻辑
@@ -34,6 +42,9 @@ public class FitnessKnowledgeService {
 
     @Resource
     private VectorStore vectorStore;
+
+    @Resource
+    private ElasticsearchClient elasticsearchClient;
 
     @Resource
     private FitnessDocumentLoader fitnessDocumentLoader;
@@ -120,7 +131,7 @@ public class FitnessKnowledgeService {
     }
 
     /**
-     * 检索知识库
+     * 检索知识库（向量相似度搜索）
      *
      * @param query    查询内容
      * @param category 分类过滤（可选）
@@ -131,7 +142,6 @@ public class FitnessKnowledgeService {
                 .query(query)
                 .topK(5)
                 .similarityThreshold(0.5);
-        // 可选按 category 元数据过滤
         if (category != null && !category.isBlank()) {
             FilterExpressionBuilder builder = new FilterExpressionBuilder();
             searchRequestBuilder.filterExpression(builder.eq("category", category).build());
@@ -139,5 +149,61 @@ public class FitnessKnowledgeService {
         List<Document> results = vectorStore.similaritySearch(searchRequestBuilder.build());
         log.info("知识库检索完成，query: {}, category: {}, 结果数: {}", query, category, results.size());
         return results;
+    }
+
+    /**
+     * 列出知识库文档条目（直接查询 ES，非向量搜索）
+     *
+     * @param category 分类过滤（可选）
+     * @param page     页码（从 0 开始）
+     * @param size     每页大小
+     * @return 包含文档列表和总数的结果
+     */
+    public Map<String, Object> listKnowledge(String category, int page, int size) {
+        try {
+            Query query;
+            if (category != null && !category.isBlank()) {
+                query = Query.of(q -> q.bool(BoolQuery.of(b -> b
+                        .filter(f -> f.term(t -> t
+                                .field("metadata.category")
+                                .value(category))))));
+            } else {
+                query = Query.of(q -> q.matchAll(m -> m));
+            }
+
+            SearchResponse<Map> response = elasticsearchClient.search(s -> s
+                            .index("fitness-knowledge")
+                            .query(query)
+                            .from(page * size)
+                            .size(size)
+                            .sort(sort -> sort.doc(d -> d))
+                            .source(src -> src.filter(f -> f
+                                    .excludes("embedding"))),
+                    Map.class);
+
+            List<Map<String, Object>> documents = new ArrayList<>();
+            for (Hit<Map> hit : response.hits().hits()) {
+                Map<String, Object> source = hit.source();
+                Map<String, Object> docMap = new HashMap<>();
+                docMap.put("id", hit.id());
+                docMap.put("content", source != null ? source.get("content") : null);
+                docMap.put("metadata", source != null ? source.get("metadata") : null);
+                documents.add(docMap);
+            }
+
+            long total = response.hits().total() != null
+                    ? response.hits().total().value() : 0;
+            log.info("知识库列表查询完成，category: {}, page: {}, size: {}, 总数: {}",
+                    category, page, size, total);
+
+            Map<String, Object> result = new HashMap<>();
+            result.put("documents", documents);
+            result.put("total", total);
+            result.put("page", page);
+            result.put("size", size);
+            return result;
+        } catch (IOException e) {
+            throw new RuntimeException("查询 Elasticsearch 失败", e);
+        }
     }
 }

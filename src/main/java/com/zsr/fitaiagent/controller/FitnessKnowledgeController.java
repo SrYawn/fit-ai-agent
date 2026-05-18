@@ -111,27 +111,17 @@ public class FitnessKnowledgeController {
     }
 
     /**
-     * 列出知识库条目（通过通用查询获取）
+     * 列出知识库条目（分页查询，非向量搜索）
      */
     @GetMapping("/list")
     public ResponseEntity<Map<String, Object>> listKnowledge(
-            @RequestParam(value = "category", required = false) String category) {
+            @RequestParam(value = "category", required = false) String category,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "10") int size) {
         try {
-            log.info("收到知识库列表请求, category={}", category);
-            // 使用通用查询词获取文档
-            List<Document> results = fitnessKnowledgeService.searchKnowledge("健身 训练 运动", category);
-            Map<String, Object> result = new HashMap<>();
+            log.info("收到知识库列表请求, category={}, page={}, size={}", category, page, size);
+            Map<String, Object> result = fitnessKnowledgeService.listKnowledge(category, page, size);
             result.put("success", true);
-            result.put("total", results.size());
-            result.put("documents", results.stream().map(doc -> {
-                Map<String, Object> docMap = new HashMap<>();
-                docMap.put("id", doc.getId());
-                docMap.put("content", doc.getText() != null && doc.getText().length() > 200
-                        ? doc.getText().substring(0, 200) + "..."
-                        : doc.getText());
-                docMap.put("metadata", doc.getMetadata());
-                return docMap;
-            }).toList());
             return ResponseEntity.ok(result);
         } catch (Exception e) {
             log.error("知识库列表查询失败", e);
